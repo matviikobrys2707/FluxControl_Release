@@ -1,0 +1,1269 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FluxControl</title>
+  <style>
+    /* ===== FluxControl Agent UI v2 — fcx design system (offline fallback).
+       Повторює дизайн AgentHostedUiPage (сайт): фіолетово-чорна палітра,
+       скруглення, скляні картки, спокійні анімації. ===== */
+    :root {
+      --bg: #050508;
+      --text: #f4f4f8;
+      --muted: #9aa0b4;
+      --card: rgba(255,255,255,.030);
+      --card-hover: rgba(255,255,255,.045);
+      --border: rgba(255,255,255,.08);
+      --border-soft: rgba(255,255,255,.06);
+      --accent: #7c3aed;
+      --grad: linear-gradient(135deg,#8b5cf6,#6366f1);
+      --ok: #34d399; --warn: #fbbf24; --err: #fb7185;
+      --radius: 20px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none;
+        font-family: 'Segoe UI Variable','Segoe UI',system-ui,-apple-system,sans-serif; }
+    html, body { height: 100vh; width: 100vw; overflow: hidden; }
+    body { background: var(--bg); color: var(--text); display: flex; flex-direction: column; position: relative; }
+
+    .fcx-glow { position: fixed; border-radius: 9999px; filter: blur(120px); pointer-events: none; z-index: 0; }
+    .fcx-glow-a { top: -140px; left: 12%; width: 460px; height: 300px; background: rgba(124,58,237,.13); }
+    .fcx-glow-b { bottom: -160px; right: 10%; width: 420px; height: 300px; background: rgba(79,70,229,.11); }
+
+    @keyframes fcx-in { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+    .fcx-in { animation: fcx-in .45s cubic-bezier(.16,1,.3,1) both; }
+    .fcx-in-1 { animation-delay:.05s; } .fcx-in-2 { animation-delay:.12s; } .fcx-in-3 { animation-delay:.19s; }
+
+    @keyframes fcx-ring { 0% { transform:scale(.9); opacity:.6; } 100% { transform:scale(1.75); opacity:0; } }
+    .fcx-ring { position:absolute; inset:-6px; border-radius:30px; border:2px solid rgba(139,92,246,.45);
+      animation:fcx-ring 2.1s ease-out infinite; pointer-events:none; }
+    .fcx-ring-late { animation-delay:1.05s; }
+
+    @keyframes fcx-spin { to { transform:rotate(360deg); } }
+    .fcx-spin { animation:fcx-spin 1s linear infinite; }
+
+    @keyframes fcx-dot { 0%,100% { opacity:.55; transform:scale(.85); } 50% { opacity:1; transform:scale(1.12); } }
+    .fcx-dot-live { animation:fcx-dot 2s ease-in-out infinite; }
+
+    @keyframes fcx-shimmer { 0% { transform:translateX(-100%); } 100% { transform:translateX(220%); } }
+    .fcx-shimmer-wrap { position:relative; overflow:hidden; }
+    .fcx-shimmer-wrap::after { content:''; position:absolute; top:0; bottom:0; width:34%;
+      background:linear-gradient(90deg,transparent,rgba(255,255,255,.35),transparent);
+      animation:fcx-shimmer 1.6s ease-in-out infinite; }
+
+    /* ===== title bar ===== */
+    .fcx-titlebar { height:46px; flex:0 0 auto; display:flex; align-items:center; justify-content:space-between;
+      padding:0 6px 0 14px; border-bottom:1px solid var(--border-soft); background:rgba(9,9,16,.6);
+      position:relative; z-index:50; user-select:none; }
+    .fcx-tb-brand { display:flex; align-items:center; gap:10px; min-width:0; pointer-events:none; }
+    .fcx-tb-logo { width:26px; height:26px; border-radius:9px; background:var(--grad); display:flex; align-items:center;
+      justify-content:center; box-shadow:0 4px 14px rgba(99,102,241,.30); flex-shrink:0; }
+    .fcx-tb-logo svg { width:14px; height:14px; fill:#fff; }
+    .fcx-tb-name { font-size:12.5px; font-weight:800; letter-spacing:-.2px; color:#f1f1f6; }
+    .fcx-tb-right { display:flex; align-items:center; gap:6px; }
+    .fcx-tb-status { display:flex; align-items:center; gap:7px; margin-right:4px; pointer-events:none; }
+    .fcx-tb-status span.lbl { font-size:11px; font-weight:600; color:#9aa0b4; white-space:nowrap; }
+    .fcx-tb-btn { height:34px; width:42px; display:flex; align-items:center; justify-content:center; border:none;
+      border-radius:10px; background:transparent; color:#8b8fa3; cursor:pointer; transition:.15s; }
+    .fcx-tb-btn:hover { background:rgba(255,255,255,.08); color:#fff; }
+    .fcx-tb-btn.close:hover { background:rgba(244,63,94,.16); color:#fda4af; }
+
+    /* ===== dots & badges ===== */
+    .fcx-dot { width:8px; height:8px; border-radius:9999px; flex-shrink:0; display:inline-block; }
+    .fcx-dot-ok { background:var(--ok); box-shadow:0 0 10px rgba(52,211,153,.7); }
+    .fcx-dot-warn { background:var(--warn); box-shadow:0 0 10px rgba(251,191,36,.55); }
+    .fcx-dot-err { background:var(--err); box-shadow:0 0 10px rgba(251,113,133,.55); }
+    .fcx-badge { display:inline-flex; align-items:center; gap:4px; padding:2.5px 8px; border-radius:9999px;
+      font-size:10px; font-weight:800; border:1px solid; white-space:nowrap; }
+    .fcx-badge.admin { background:rgba(139,92,246,.15); color:#c4b5fd; border-color:rgba(139,92,246,.32); }
+    .fcx-badge.pro { background:rgba(52,211,153,.13); color:#6ee7b7; border-color:rgba(52,211,153,.30); }
+    .fcx-badge.inactive { background:rgba(251,191,36,.13); color:#fcd34d; border-color:rgba(251,191,36,.30); }
+
+    /* ===== buttons ===== */
+    .fcx-btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; height:38px; padding:0 16px;
+      border-radius:12px; font-size:12.5px; font-weight:700; cursor:pointer; border:1px solid transparent;
+      transition:filter .15s, background .15s, border-color .15s, transform .1s; user-select:none; white-space:nowrap; }
+    .fcx-btn:active { transform:scale(.98); }
+    .fcx-btn-primary { background:var(--grad); color:#fff; box-shadow:0 8px 22px rgba(99,102,241,.28); }
+    .fcx-btn-primary:hover { filter:brightness(1.14); }
+    .fcx-btn-ghost { background:rgba(255,255,255,.045); border-color:rgba(255,255,255,.09); color:#d6d8e4; }
+    .fcx-btn-ghost:hover { background:rgba(255,255,255,.09); color:#fff; border-color:rgba(255,255,255,.16); }
+    .fcx-btn-danger { background:rgba(244,63,94,.10); border-color:rgba(244,63,94,.30); color:#fda4af; }
+    .fcx-btn-danger:hover { background:rgba(244,63,94,.18); }
+    .fcx-btn-sm { height:32px; padding:0 12px; font-size:11.5px; border-radius:10px; }
+    .fcx-btn.wfull { width:100%; }
+    .fcx-icon-btn { width:34px; height:34px; padding:0; display:inline-flex; align-items:center; justify-content:center;
+      border-radius:10px; border:1px solid rgba(255,255,255,.09); background:rgba(255,255,255,.045);
+      color:#c8cad8; cursor:pointer; transition:.15s; flex-shrink:0; }
+    .fcx-icon-btn:hover { background:rgba(255,255,255,.10); color:#fff; }
+
+    /* ===== layout: sidebar + main ===== */
+    .fcx-body { flex:1; min-height:0; display:flex; position:relative; z-index:10; }
+    .fcx-side { width:212px; flex-shrink:0; display:flex; flex-direction:column; justify-content:space-between;
+      padding:14px 12px; border-right:1px solid var(--border-soft); background:rgba(8,8,15,.45); min-width:0; }
+    .fcx-side-user { display:flex; align-items:center; gap:10px; padding:2px 4px 14px; }
+    .fcx-avatar { width:36px; height:36px; border-radius:12px; background:rgba(139,92,246,.25);
+      border:1px solid rgba(139,92,246,.45); display:flex; align-items:center; justify-content:center;
+      font-size:13px; font-weight:800; color:#fff; overflow:hidden; flex-shrink:0; }
+    .fcx-avatar img { width:100%; height:100%; object-fit:cover; }
+    .fcx-side-user .nm { font-size:12px; font-weight:700; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .fcx-side-user .em { font-size:10px; color:#8b8fa3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+    .fcx-nav { display:flex; flex-direction:column; gap:6px; }
+    .fcx-nav-btn { display:flex; align-items:center; gap:10px; width:100%; padding:10px 13px; border:none;
+      border-radius:12px; background:transparent; color:#9aa0b4; font-size:12.5px; font-weight:700;
+      cursor:pointer; transition:.15s; text-align:left; }
+    .fcx-nav-btn svg { width:16px; height:16px; flex-shrink:0; }
+    .fcx-nav-btn:hover { background:rgba(255,255,255,.05); color:#fff; }
+    .fcx-nav-btn.active { background:var(--grad); color:#fff; box-shadow:0 6px 18px rgba(99,102,241,.30); }
+
+    .fcx-side-bottom { padding-top:12px; border-top:1px solid var(--border-soft); display:flex; flex-direction:column; gap:8px; }
+    .btn-text { background:transparent; border:none; color:#818cf8; font-size:11px; font-weight:600; cursor:pointer;
+      display:flex; align-items:center; gap:4px; transition:color .15s; padding:4px; }
+    .btn-text:hover { color:#a5b4fc; }
+
+    .fcx-main { flex:1; min-width:0; overflow-y:auto; position:relative; }
+    .fcx-main::-webkit-scrollbar { width:8px; }
+    .fcx-main::-webkit-scrollbar-thumb { background:rgba(255,255,255,.14); border-radius:8px; }
+    .fcx-content { max-width:720px; margin:0 auto; padding:20px 20px 24px; display:flex; flex-direction:column; gap:14px; }
+
+    /* Narrow window / mobile: sidebar hides, compact tab bar under the title bar. */
+    @media (max-width: 767.9px) {
+      .fcx-side { display:none !important; }
+      .fcx-content { padding-top:64px; }
+      .fcx-mtabs { display:flex; }
+    }
+    .fcx-mtabs { display:none; position:absolute; top:0; left:0; right:0; z-index:20; gap:4px; padding:8px 12px;
+      background:rgba(8,8,15,0.88); -webkit-backdrop-filter:blur(16px); backdrop-filter:blur(16px);
+      border-bottom:1px solid var(--border-soft); }
+    .fcx-mtabs .fcx-mtab { flex:1; display:flex; align-items:center; justify-content:center; gap:6px; height:34px;
+      border:none; border-radius:10px; background:transparent; color:#9aa0b4; font-size:11.5px; font-weight:700;
+      cursor:pointer; transition:.15s; }
+    .fcx-mtabs .fcx-mtab:hover { background:rgba(255,255,255,.05); color:#fff; }
+    .fcx-mtabs .fcx-mtab.active { background:linear-gradient(135deg,rgba(139,92,246,.9),rgba(99,102,241,.9)); color:#fff;
+      box-shadow:0 4px 14px rgba(99,102,241,.25); }
+
+    .tab-content { display:none; flex-direction:column; gap:14px; }
+    .tab-content.active { display:flex; }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
+    .tab-content.active { animation:fadeIn .22s ease-in; }
+
+    /* ===== cards ===== */
+    .fcx-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); }
+    .fcx-eyebrow { font-size:10.5px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:#8b8fa3; }
+    .fcx-pill { padding:4px 10px; border-radius:9999px; background:rgba(255,255,255,.045); border:1px solid var(--border);
+      font-size:10.5px; font-weight:700; color:#d3d5e0; }
+
+    .fcx-hero { padding:20px; position:relative; overflow:hidden; }
+    .fcx-hero-glow { position:absolute; top:-64px; right:-40px; width:220px; height:160px;
+      background:rgba(124,58,237,.10); border-radius:9999px; filter:blur(70px); pointer-events:none; }
+    .fcx-hero-top { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px; flex-wrap:wrap; position:relative; }
+    .fcx-code-box { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+      background:rgba(0,0,0,.45); border:1px solid rgba(139,92,246,.18); padding:16px; border-radius:16px; position:relative; }
+    .fcx-code { font-family:'Cascadia Code','JetBrains Mono',Consolas,monospace; font-weight:800; font-size:30px;
+      letter-spacing:.16em; line-height:1.05; background:linear-gradient(90deg,#c4b5fd,#a5b4fc);
+      -webkit-background-clip:text; background-clip:text; color:transparent;
+      text-shadow:0 0 34px rgba(139,92,246,.25); user-select:all; word-break:break-all; }
+    .fcx-hero-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding-top:16px; position:relative; }
+    .fcx-hero-hint { font-size:11px; color:#9aa0b4; padding-top:14px; position:relative; }
+    .fcx-hero-hint strong { color:#fff; font-family:monospace; }
+    .fcx-hero-hint .dim { color:#6f7488; }
+
+    .fcx-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+    @media (max-width:760px) { .fcx-stats { grid-template-columns:1fr; } }
+    .fcx-stat { display:flex; flex-direction:column; gap:5px; padding:13px 15px; border-radius:16px;
+      background:rgba(255,255,255,.028); border:1px solid rgba(255,255,255,.075); min-width:0; }
+    .fcx-stat .lbl { font-size:10.5px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#8b8fa3; }
+    .fcx-stat .val { font-size:13px; font-weight:800; color:#f4f4f8; display:flex; align-items:center; gap:7px; min-width:0; }
+    .fcx-stat .val .txt { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .fcx-stat svg { width:16px; height:16px; flex-shrink:0; color:rgba(196,181,253,.8); }
+
+    .fcx-warnstrip { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+      padding:14px; border-radius:16px; background:rgba(251,191,36,.07); border:1px solid rgba(251,191,36,.25); }
+    .fcx-warnstrip .t1 { font-size:11.5px; font-weight:800; color:#fde68a; }
+    .fcx-warnstrip .t2 { font-size:10.5px; color:rgba(253,230,138,.7); margin-top:2px; }
+
+    .fcx-qr { display:flex; align-items:center; gap:16px; padding:16px; }
+    .fcx-qr-box { width:104px; height:104px; background:#fff; border-radius:16px; padding:8px; flex-shrink:0;
+      display:flex; align-items:center; justify-content:center; box-shadow:0 10px 26px rgba(0,0,0,.4); }
+    .fcx-qr-box img { width:100%; height:100%; object-fit:contain; }
+    .fcx-qr h4 { font-size:13px; font-weight:700; color:#fff; margin-bottom:6px; }
+    .fcx-qr p { font-size:11.5px; color:#9aa0b4; line-height:1.55; }
+
+    .fcx-foot { text-align:center; font-size:11px; color:#6f7488; display:flex; align-items:center; justify-content:center; gap:6px; }
+
+    /* ===== settings ===== */
+    .fcx-set-card { padding:16px; }
+    .fcx-set-row { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:14px 0; }
+    .fcx-set-row + .fcx-set-row { border-top:1px solid rgba(255,255,255,.06); }
+    .fcx-set-title { font-size:13px; font-weight:700; color:#fff; margin-bottom:2px; }
+    .fcx-set-sub { font-size:11.5px; color:#9aa0b4; }
+    .switch { position:relative; display:inline-block; width:46px; height:26px; flex-shrink:0; }
+    .switch input { opacity:0; width:0; height:0; }
+    .slider { position:absolute; cursor:pointer; inset:0; background-color:rgba(255,255,255,.10);
+      transition:.2s; border-radius:24px; border:1px solid rgba(255,255,255,.15); }
+    .slider:before { position:absolute; content:""; height:18px; width:18px; left:3px; top:3px;
+      background-color:#fff; transition:.2s; border-radius:50%; box-shadow:0 2px 6px rgba(0,0,0,.4); }
+    input:checked + .slider { background-color:var(--accent); border-color:#8b5cf6; }
+    input:checked + .slider:before { transform:translateX(20px); }
+
+    .fcx-about-row { display:flex; align-items:center; justify-content:space-between; font-size:12px; padding:5px 0; }
+    .fcx-about-row .k { color:#9aa0b4; } .fcx-about-row .v { font-weight:700; color:#fff; }
+
+    /* ===== fullscreen screens (splash / auth / installer) ===== */
+    .fcx-screen { position:absolute; inset:0; z-index:90; background:var(--bg); display:none; flex-direction:column; overflow:hidden; }
+    .fcx-screen.visible { display:flex; }
+    .fcx-screen-body { flex:1; min-height:0; overflow-y:auto; display:flex; align-items:center; justify-content:center; padding:28px 20px; position:relative; }
+    .fcx-screen-body::-webkit-scrollbar { width:8px; }
+    .fcx-screen-body::-webkit-scrollbar-thumb { background:rgba(255,255,255,.14); border-radius:8px; }
+
+    #startupSplash { position:absolute; inset:0; z-index:99; background:var(--bg); display:flex; flex-direction:column;
+      transition:opacity .3s ease, visibility .3s; }
+    #startupSplash.hidden { opacity:0; visibility:hidden; pointer-events:none; }
+    .splash-content { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; position:relative; }
+    .splash-logo-box { position:relative; margin-bottom:26px; }
+    .splash-logo { width:84px; height:84px; border-radius:26px; background:var(--grad); display:flex; align-items:center;
+      justify-content:center; box-shadow:0 18px 46px rgba(99,102,241,.42); }
+    .splash-logo svg { width:40px; height:40px; fill:#fff; }
+    .splash-word { font-size:26px; font-weight:900; letter-spacing:-.5px; margin-bottom:6px; }
+    .splash-word .a { background:linear-gradient(90deg,#fff,#9ca3af); -webkit-background-clip:text; background-clip:text; color:transparent; }
+    .splash-word .b { background:linear-gradient(90deg,#c4b5fd,#a5b4fc); -webkit-background-clip:text; background-clip:text; color:transparent; }
+    .splash-sub { font-size:11.5px; color:#9aa0b4; margin-bottom:24px; }
+    .splash-pill { display:flex; align-items:center; gap:8px; padding:6px 14px; background:rgba(255,255,255,.04);
+      border:1px solid rgba(255,255,255,.09); border-radius:20px; font-size:11.5px; color:#d3d5e0; width:fit-content; margin:0 auto 14px; }
+    .splash-pill svg { width:14px; height:14px; color:#a78bfa; }
+    .splash-bar { width:210px; height:8px; border-radius:9999px; background:rgba(255,255,255,.07); overflow:hidden; position:relative; }
+    .splash-bar i { display:block; width:36%; height:100%; border-radius:inherit; background:var(--grad); }
+    .splash-foot { text-align:center; font-size:11px; color:#6f7488; padding-bottom:20px; display:flex; align-items:center; justify-content:center; gap:6px; }
+
+    .fcx-auth-box { width:100%; max-width:380px; text-align:center; }
+    .fcx-auth-logo { width:92px; height:92px; border-radius:28px; margin:0 auto 22px; background:var(--grad);
+      display:flex; align-items:center; justify-content:center; box-shadow:0 20px 50px rgba(99,102,241,.4); position:relative; }
+    .fcx-auth-logo svg { width:44px; height:44px; fill:#fff; }
+    .fcx-screen h1 { font-size:23px; font-weight:900; letter-spacing:-.3px; margin-bottom:10px; }
+    .fcx-screen p.sub { color:#9aa0b4; font-size:12px; line-height:1.65; margin-bottom:22px; }
+    .fcx-relay-row { display:flex; flex-direction:column; align-items:center; gap:10px; padding-top:4px; }
+    .fcx-relay-line { display:flex; align-items:center; justify-content:center; gap:8px; font-size:11px; color:#9aa0b4; }
+
+    .fcx-install-box { width:100%; max-width:460px; padding:28px; border-radius:24px; background:var(--card);
+      border:1px solid var(--border); box-shadow:0 24px 60px rgba(0,0,0,.5); text-align:center; }
+    .fcx-install-icon { width:84px; height:84px; border-radius:26px; margin:0 auto 16px; display:flex; align-items:center;
+      justify-content:center; border:1px solid rgba(139,92,246,.40); background:rgba(124,58,237,.15); position:relative; }
+    .fcx-install-icon svg { width:40px; height:40px; color:#c4b5fd; }
+    .fcx-install-icon.failed { border-color:rgba(251,191,36,.40); background:rgba(217,119,6,.15); }
+    .fcx-install-icon.failed svg { color:#fcd34d; }
+    .fcx-pct { font-size:44px; font-weight:800; line-height:1; font-family:'Cascadia Code',Consolas,monospace;
+      letter-spacing:.04em; background:linear-gradient(90deg,#c4b5fd,#a5b4fc); -webkit-background-clip:text;
+      background-clip:text; color:transparent; margin-bottom:6px; }
+    .fcx-eta { font-size:11px; color:#c4b5fd; margin-bottom:12px; }
+    .fcx-progress { height:8px; border-radius:9999px; background:rgba(255,255,255,.07); overflow:hidden; position:relative; margin-bottom:8px; }
+    .fcx-progress i { display:block; height:100%; border-radius:inherit; background:var(--grad); transition:width .3s ease; }
+    .fcx-stage { font-size:11px; color:#9aa0b4; margin-bottom:14px; }
+    .fcx-minimize-note { font-size:11px; color:#9aa0b4; display:flex; align-items:center; justify-content:center; gap:6px; margin-top:14px; }
+    .fcx-install-actions { display:flex; flex-direction:column; gap:10px; margin-top:16px; text-align:left; }
+    .fcx-note { color:#6f7488; font-size:10.5px; line-height:1.6; margin-top:12px; }
+    .fcx-warn-text { color:#fcd34d; font-size:11.5px; line-height:1.55; }
+    .fcx-errbox { padding:12px; border-radius:14px; background:rgba(251,191,36,.08); border:1px solid rgba(251,191,36,.25); }
+    .fcx-errbox b { color:#fde68a; }
+    .fcx-errbox .txt { color:rgba(253,230,138,.85); font-size:11px; line-height:1.55; word-break:break-word; }
+
+    /* pairing modal */
+    .fcx-pair-backdrop { position:absolute; left:0; right:0; top:46px; bottom:0; z-index:80; display:none;
+      align-items:center; justify-content:center; padding:16px; background:rgba(0,0,0,.70); backdrop-filter:blur(6px); }
+    .fcx-pair-backdrop.visible { display:flex; }
+    .fcx-pair-card { width:100%; max-width:380px; padding:20px; border-radius:22px; background:rgba(12,12,22,.95);
+      border:1px solid rgba(255,255,255,.10); box-shadow:0 30px 80px rgba(0,0,0,.6); display:flex; flex-direction:column; gap:14px; }
+    .fcx-pair-head { display:flex; align-items:center; gap:12px; }
+    .fcx-pair-ico { width:44px; height:44px; border-radius:14px; background:rgba(124,58,237,.15);
+      border:1px solid rgba(139,92,246,.35); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .fcx-pair-ico svg { width:20px; height:20px; color:#c4b5fd; }
+    .fcx-pair-title { font-size:13.5px; font-weight:800; color:#fff; }
+    .fcx-pair-sub { font-size:11px; color:#9aa0b4; }
+    .fcx-pair-text { font-size:12px; color:#d3d5e0; line-height:1.6; }
+    .fcx-pair-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .fcx-pair-note { font-size:10px; color:#6f7488; text-align:center; }
+
+    /* ===== agent toasts (fcax) — SAME visual language as the hosted UI:
+       bottom-right, gradient accent bar, branded. Distinct from the site. ===== */
+    #fcax-toast-stack { position:fixed; right:14px; bottom:14px; z-index:2147483000; display:flex; flex-direction:column-reverse; gap:8px; width:min(88vw,308px); pointer-events:none; }
+    .fcax-toast { pointer-events:auto; position:relative; display:flex; align-items:flex-start; gap:10px; padding:11px 12px 12px 16px; border-radius:14px;
+      background:linear-gradient(160deg,rgba(23,21,38,.985),rgba(13,12,24,.985));
+      border:1px solid rgba(255,255,255,.09); border-left:none;
+      box-shadow:0 18px 44px rgba(0,0,0,.65),0 2px 10px rgba(0,0,0,.4);
+      color:#ececf4; font-size:12px; font-weight:600; line-height:1.45;
+      opacity:0; transform:translateY(14px) scale(.97); transition:opacity .22s ease, transform .3s cubic-bezier(.16,1,.3,1); overflow:hidden; }
+    .fcax-toast.show { opacity:1; transform:none; }
+    .fcax-toast::before { content:''; position:absolute; left:0; top:8px; bottom:8px; width:4px; border-radius:0 4px 4px 0; background:linear-gradient(180deg,#8b5cf6,#6366f1); }
+    .fcax-toast.fcax-success::before { background:linear-gradient(180deg,#34d399,#059669); }
+    .fcax-toast.fcax-error::before { background:linear-gradient(180deg,#fb7185,#e11d48); }
+    .fcax-toast.fcax-warn::before { background:linear-gradient(180deg,#fbbf24,#d97706); }
+    .fcax-icon { display:grid; place-items:center; width:26px; height:26px; flex:0 0 auto; border-radius:9px; margin-top:1px; }
+    .fcax-icon svg { width:13px; height:13px; }
+    .fcax-body { flex:1; min-width:0; padding-right:2px; }
+    .fcax-title { display:flex; align-items:center; gap:5px; color:#fff; font-size:12px; font-weight:800; }
+    .fcax-brand { display:inline-grid; place-items:center; width:11px; height:11px; color:#a78bfa; }
+    .fcax-brand svg { width:11px; height:11px; }
+    .fcax-msg { display:block; color:#a9adbf; font-size:11.5px; margin-top:2px; word-break:break-word; }
+    .fcax-close { flex:0 0 auto; display:grid; place-items:center; width:20px; height:20px; border-radius:7px; color:#6b6f82; cursor:pointer; background:transparent; border:none; }
+    .fcax-close:hover { color:#fff; background:rgba(255,255,255,.08); }
+    .fcax-close svg { width:11px; height:11px; }
+    .fcax-progress { position:absolute; left:16px; right:0; bottom:0; height:2.5px; border-radius:3px 0 0 0; transform-origin:left; background:linear-gradient(90deg,#8b5cf6,#6366f1); }
+    .fcax-success .fcax-progress { background:linear-gradient(90deg,#34d399,#10b981); }
+    .fcax-error .fcax-progress { background:linear-gradient(90deg,#fb7185,#f43f5e); }
+    .fcax-warn .fcax-progress { background:linear-gradient(90deg,#fbbf24,#f59e0b); }
+    @keyframes fcaxShrink { from { transform:scaleX(1); } to { transform:scaleX(0); } }
+
+    /* ===== fullscreen QR overlay ===== */
+    .fcx-qr-full { position:absolute; left:0; right:0; top:46px; bottom:0; z-index:80; display:none; flex-direction:column;
+      align-items:center; justify-content:center; gap:18px; background:rgba(0,0,0,.85); backdrop-filter:blur(8px); cursor:pointer; }
+    .fcx-qr-full.visible { display:flex; }
+    .fcx-qr-full .bigbox { padding:16px; background:#fff; border-radius:24px; box-shadow:0 30px 80px rgba(124,58,237,.35);
+      width:min(58vh,72vw,420px); height:min(58vh,72vw,420px); }
+    .fcx-qr-full .bigbox img { width:100%; height:100%; object-fit:contain; }
+    .fcx-qr-full .hint { display:flex; align-items:center; gap:6px; font-size:11px; color:#6f7488; }
+
+    /* ===== regenerate confirm modal (reuses pair-card styles) ===== */
+    .fcx-regen-backdrop { position:absolute; left:0; right:0; top:46px; bottom:0; z-index:80; display:none;
+      align-items:center; justify-content:center; padding:16px; background:rgba(0,0,0,.75); backdrop-filter:blur(6px); }
+    .fcx-regen-backdrop.visible { display:flex; }
+    .fcx-regen-list { display:flex; flex-direction:column; gap:8px; }
+    .fcx-regen-list .li { display:flex; align-items:flex-start; gap:8px; font-size:11.5px; color:#9aa0b4; line-height:1.55; }
+    .fcx-regen-list .li svg { width:14px; height:14px; flex-shrink:0; margin-top:2px; }
+
+    /* ===== account tab ===== */
+    .fcx-acc-head { display:flex; align-items:center; gap:16px; flex-wrap:wrap; position:relative; }
+    .fcx-acc-avatar-lg { width:64px; height:64px; border-radius:20px; font-size:22px; }
+    .fcx-sub-box { display:flex; align-items:center; gap:12px; padding:12px; border-radius:14px; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.07); }
+    .fcx-sub-ico { width:36px; height:36px; border-radius:12px; display:grid; place-items:center; flex-shrink:0; border:1px solid; }
+    .fcx-sub-ico svg { width:17px; height:17px; }
+    .fcx-key-input { flex:1; min-width:180px; height:38px; border-radius:12px; background:rgba(0,0,0,.45); border:1px solid rgba(255,255,255,.10);
+      outline:none; padding:0 14px; color:#fff; font-family:'Cascadia Code',Consolas,monospace; font-weight:700; font-size:12.5px; letter-spacing:.08em;
+      text-transform:uppercase; transition:border-color .15s; }
+    .fcx-key-input:focus { border-color:rgba(196,181,253,.6); }
+    .fcx-key-input::placeholder { color:#6f7488; font-weight:400; letter-spacing:0; }
+
+    /* ===== HOSTED WINDOW (тільки всередині FluxControl.exe) =====
+       WPF-вікно НЕПРОЗОРЕ (#05050A), кути скруглює сама ОС (DWM на Win11
+       / GDI-регіон на Win10). Сторінка заповнює вікно edge-to-edge —
+       жодних відступів, тіней чи CSS-хрому, тож артефактів не буває. */
+    html.fcx-hosted, html.fcx-hosted body { background: #05050A !important; }
+    #fcx-shell { display:flex; flex-direction:column; height:100vh; width:100vw; position:relative; background:var(--bg); }
+  </style>
+</head>
+<body>
+  <div id="fcx-shell">
+  <div class="fcx-glow fcx-glow-a"></div>
+  <div class="fcx-glow fcx-glow-b"></div>
+
+  <!-- ================= TITLE BAR (drag zone) ================= -->
+  <div class="fcx-titlebar" onmousedown="startDrag(event)">
+    <div class="fcx-tb-brand">
+      <div class="fcx-tb-logo" style="background:transparent; box-shadow:none; overflow:visible;">
+        <svg width="26" height="26" viewBox="0 0 512 512" aria-hidden="true"><defs><linearGradient id="fcring" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#A78BFA"/><stop offset=".55" stop-color="#7C3AED"/><stop offset="1" stop-color="#4F46E5"/></linearGradient><linearGradient id="fcbl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#E0E7FF"/></linearGradient></defs><rect x="24" y="24" width="464" height="464" rx="112" fill="#0B0A14"/><path d="M 326.4 123.6 A 150 150 0 1 1 185.6 123.6" fill="none" stroke="url(#fcring)" stroke-width="42" stroke-linecap="round"/><g transform="translate(94,94) scale(13.5)"><path d="M13 2 L3 14 h9 l-1 8 L21 10 h-9 l1 -8 Z" fill="url(#fcbl)"/></g></svg>
+      </div>
+      <span class="fcx-tb-name">FluxControl</span>
+    </div>
+    <div class="fcx-tb-right" onmousedown="event.stopPropagation()">
+      <div class="fcx-tb-status">
+        <span class="fcx-dot fcx-dot-ok fcx-dot-live" id="statusDot"></span>
+        <span class="lbl" id="statusTxt">Хмарна служба: Підключення…</span>
+      </div>
+      <button class="fcx-tb-btn" onclick="sendToHost('window_minimize')" title="Згорнути" aria-label="Згорнути">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" x2="19" y1="12" y2="12"/></svg>
+      </button>
+      <button class="fcx-tb-btn close" onclick="sendToHost('window_close')" title="Закрити" aria-label="Закрити">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- ================= BODY: sidebar + main ================= -->
+  <div class="fcx-body">
+
+    <!-- Mobile tab bar: replaces the sidebar on narrow windows -->
+    <nav class="fcx-mtabs" aria-label="Навігація">
+      <button class="fcx-mtab active" id="mtabNavMain" onclick="switchTab('main')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        <span>Головна</span>
+      </button>
+      <button class="fcx-mtab" id="mtabNavAccount" onclick="switchTab('account')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span>Акаунт</span>
+      </button>
+      <button class="fcx-mtab" id="mtabNavSettings" onclick="switchTab('settings')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" x2="4" y1="21" y2="14"/><line x1="4" x2="4" y1="10" y2="3"/><line x1="12" x2="12" y1="21" y2="12"/><line x1="12" x2="12" y1="8" y2="3"/><line x1="20" x2="20" y1="21" y2="16"/><line x1="20" x2="20" y1="12" y2="3"/><line x1="1" x2="7" y1="14" y2="14"/><line x1="9" x2="15" y1="8" y2="8"/><line x1="17" x2="23" y1="16" y2="16"/></svg>
+        <span>Налаштування</span>
+      </button>
+    </nav>
+
+    <aside class="fcx-side">
+      <div style="min-width:0;">
+        <nav class="fcx-nav">
+          <button class="fcx-nav-btn active" id="tabNavMain" onclick="switchTab('main')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            <span>Головна</span>
+          </button>
+          <button class="fcx-nav-btn" id="tabNavAccount" onclick="switchTab('account')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <span>Акаунт</span>
+          </button>
+          <button class="fcx-nav-btn" id="tabNavSettings" onclick="switchTab('settings')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" x2="4" y1="21" y2="14"/><line x1="4" x2="4" y1="10" y2="3"/><line x1="12" x2="12" y1="21" y2="12"/><line x1="12" x2="12" y1="8" y2="3"/><line x1="20" x2="20" y1="21" y2="16"/><line x1="20" x2="20" y1="12" y2="3"/><line x1="1" x2="7" y1="14" y2="14"/><line x1="9" x2="15" y1="8" y2="8"/><line x1="17" x2="23" y1="16" y2="16"/></svg>
+            <span>Налаштування</span>
+          </button>
+        </nav>
+      </div>
+
+      <!-- User info lives in ONE place — bottom-left: іконка + ім'я / email (без статусу) -->
+      <div class="fcx-side-bottom">
+        <div id="profileLoggedBox" style="display:none; flex-direction:column; gap:8px;">
+          <div class="fcx-side-user" style="padding:2px 4px 8px;">
+            <div class="fcx-avatar" id="userAvatar">U</div>
+            <div style="min-width:0;">
+              <span class="nm" id="userNameTxt" style="display:block; font-size:13px; font-weight:800; color:#f4f4f8;">Користувач</span>
+              <div class="em" id="userEmailTxt" style="margin-top:3px;">—</div>
+            </div>
+          </div>
+        </div>
+        <div id="profileGuestBox">
+          <button class="fcx-btn fcx-btn-primary fcx-btn-sm wfull" onclick="sendToHost('login_via_browser')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>
+            <span>Увійти через браузер</span>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <main class="fcx-main">
+      <div class="fcx-content">
+
+        <!-- TAB 1: Головна -->
+        <div class="tab-content active" id="tabContentMain">
+
+          <section class="fcx-card fcx-hero fcx-in" aria-label="Код підключення">
+            <div class="fcx-hero-glow"></div>
+            <div class="fcx-hero-top">
+              <span class="fcx-eyebrow">Підключення з сайту</span>
+              <span class="fcx-pill" id="pcNameBadge" style="display:none;">ПК: —</span>
+            </div>
+            <div class="fcx-code-box">
+              <span class="fcx-code" id="codeText">••••-••••-••••-••••</span>
+              <button class="fcx-icon-btn" id="btnCopyIcon" onclick="copyCode()" title="Копіювати код" aria-label="Копіювати код">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+              </button>
+            </div>
+            <div class="fcx-hero-actions">
+              <button class="fcx-btn fcx-btn-primary" onclick="copyWebLink()">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                <span id="copyLinkTxt">Пряме посилання</span>
+              </button>
+              <button class="fcx-btn fcx-btn-ghost" id="btnQrToggle" onclick="toggleQr()" aria-pressed="true">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="5" height="5" x="3" y="3" rx="1"/><rect width="5" height="5" x="16" y="3" rx="1"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M21 16h-3a2 2 0 0 0-2 2v3M21 21v.01M12 7v3a2 2 0 0 1-2 2H7M3 12h.01M12 3h.01M12 16v.01M16 12h1M21 12v.01M12 21v-1"/></svg>
+                <span id="qrToggleTxt">Приховати QR</span>
+              </button>
+            </div>
+            <p class="fcx-hero-hint">Введіть цей код на сайті <strong>fluxcontrol.pages.dev</strong> <span class="dim">— або відскануйте QR-код камерою телефона.</span></p>
+          </section>
+
+          <!-- Жива статистика з'єднання (пінг/швидкість з авто-speedtest хоста) -->
+          <section class="fcx-in fcx-in-1" id="speedStats" style="display:none; justify-content:center; gap:18px; flex-wrap:wrap; font-size:11px; color:#9aa0b4;">
+            <span style="display:inline-flex; align-items:center; gap:6px;">
+              <span style="width:6px; height:6px; border-radius:99px; background:var(--ok);"></span>
+              Пінг: <strong id="stPing" style="color:#fff;">— мс</strong>
+            </span>
+            <span style="display:inline-flex; align-items:center; gap:6px;">↓ <strong id="stDown" style="color:#fff;">—</strong></span>
+            <span style="display:inline-flex; align-items:center; gap:6px;">↑ <strong id="stUp" style="color:#fff;">—</strong></span>
+          </section>
+
+          <section class="fcx-warnstrip fcx-in fcx-in-2" id="relayStrip" style="display:none;">
+            <div style="min-width:0;">
+              <p class="t1" id="relayStripTitle">Підключення до хмарної служби…</p>
+              <p class="t2" id="relayStripSub">Поки служба не підключена, код не працюватиме на сайті.</p>
+            </div>
+            <button class="fcx-btn fcx-btn-ghost fcx-btn-sm" id="btnRetryConn" style="display:none;" onclick="sendToHost('retry_connection')">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+              <span>Спробувати ще раз</span>
+            </button>
+          </section>
+
+          <section class="fcx-card fcx-qr fcx-in fcx-in-2" id="qrCard">
+            <button class="fcx-qr-box" style="border:none; cursor:zoom-in; padding:8px;" onclick="openQrFull()" title="Відкрити на весь екран" aria-label="Відкрити QR-код на весь екран">
+              <img id="qrImg" src="" alt="QR Code" style="display:none;" />
+              <svg id="qrPlaceholder" width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#4b5563" stroke-width="1.5"><rect width="5" height="5" x="3" y="3" rx="1"/><rect width="5" height="5" x="16" y="3" rx="1"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M21 16h-3a2 2 0 0 0-2 2v3M21 21v.01M12 7v3a2 2 0 0 1-2 2H7M3 12h.01M12 3h.01M12 16v.01M16 12h1M21 12v.01M12 21v-1"/></svg>
+            </button>
+            <div style="min-width:0;">
+              <h4>Швидке підключення зі смартфона</h4>
+              <p>Відскануйте QR-код камерою телефона, щоб миттєво відкрити панель керування цим комп'ютером у мобільному браузері.</p>
+              <button class="fcx-btn fcx-btn-ghost fcx-btn-sm" style="margin-top:10px;" onclick="openQrFull()">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="5" height="5" x="3" y="3" rx="1"/><rect width="5" height="5" x="16" y="3" rx="1"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M21 16h-3a2 2 0 0 0-2 2v3M21 21v.01M12 7v3a2 2 0 0 1-2 2H7M3 12h.01M12 3h.01M12 16v.01M16 12h1M21 12v.01M12 21v-1"/></svg>
+                <span>Збільшити на весь екран</span>
+              </button>
+            </div>
+          </section>
+
+          <p class="fcx-foot fcx-in fcx-in-3">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" style="opacity:.7;"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>
+            Захищене з'єднання · Код оновлюється під час кожного запуску програми
+          </p>
+        </div>
+
+        <!-- TAB 2: Налаштування -->
+        <div class="tab-content" id="tabContentSettings">
+          <section class="fcx-card fcx-set-card fcx-in">
+            <p class="fcx-eyebrow" style="margin-bottom:4px;">Код підключення</p>
+            <div class="fcx-set-row">
+              <div style="min-width:0;">
+                <div class="fcx-set-title">Оновити код доступу</div>
+                <div class="fcx-set-sub">Створить новий код замість поточного. Попередній код, QR та пряме посилання перестануть діяти.</div>
+              </div>
+              <button class="fcx-btn fcx-btn-ghost fcx-btn-sm" style="flex-shrink:0;" onclick="openRegenConfirm()">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+                <span>Оновити код</span>
+              </button>
+            </div>
+          </section>
+
+          <section class="fcx-card fcx-set-card fcx-in fcx-in-1">
+            <p class="fcx-eyebrow" style="margin-bottom:4px;">Загальні</p>
+            <div class="fcx-set-row">
+              <div>
+                <div class="fcx-set-title">Автозапуск при старті Windows</div>
+                <div class="fcx-set-sub">Запускати програму у фоні при вході в систему</div>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="autoRunSwitch" onchange="toggleAutoRun(this.checked)">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="fcx-set-row">
+              <div>
+                <div class="fcx-set-title">Згортати в системний трей</div>
+                <div class="fcx-set-sub">При закритті ховати вікно поруч з годинником</div>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="traySwitch" onchange="toggleTray(this.checked)">
+                <span class="slider"></span>
+              </label>
+            </div>
+          </section>
+
+          <section class="fcx-card fcx-set-card fcx-in fcx-in-1">
+            <p class="fcx-eyebrow" style="margin-bottom:8px;">Про програму</p>
+            <div class="fcx-about-row"><span class="k">FluxControl Agent</span><span class="v">v2.0</span></div>
+            <div class="fcx-about-row"><span class="k">Компонент FFmpeg</span><span class="v" id="aboutFfmpeg">—</span></div>
+            <div class="fcx-about-row"><span class="k">Ім'я комп'ютера</span><span class="v" id="aboutPcName">—</span></div>
+          </section>
+        </div>
+
+        <!-- TAB 3: Акаунт -->
+        <div class="tab-content" id="tabContentAccount">
+          <!-- profile header -->
+          <section class="fcx-card fcx-hero fcx-in">
+            <div class="fcx-hero-glow"></div>
+            <div class="fcx-acc-head">
+              <div class="fcx-avatar fcx-acc-avatar-lg" id="accAvatar">U</div>
+              <div style="min-width:0; flex:1;">
+                <div style="font-size:16px; font-weight:900; color:#fff; letter-spacing:-.3px;" id="accName">Користувач</div>
+                <div style="font-size:11.5px; color:#9aa0b4; margin-top:2px;" id="accEmail">—</div>
+                <div style="margin-top:8px;"><span class="fcx-badge pro" id="accSubBadge">PRO</span></div>
+              </div>
+            </div>
+          </section>
+
+          <!-- subscription -->
+          <section class="fcx-card fcx-set-card fcx-in fcx-in-1">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px;">
+              <p class="fcx-eyebrow">Підписка</p>
+              <button class="fcx-btn fcx-btn-ghost fcx-btn-sm" onclick="sendToHost('check_subscription')">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+                <span>Оновити</span>
+              </button>
+            </div>
+            <div class="fcx-sub-box">
+              <div class="fcx-sub-ico" id="accSubIco" style="background:rgba(52,211,153,.13); border-color:rgba(52,211,153,.35); color:#6ee7b7;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z"/><path d="m9 12 2 2 4-4"/></svg>
+              </div>
+              <div style="min-width:0; flex:1;">
+                <div style="font-size:12.5px; font-weight:800; color:#fff;" id="accSubTitle">PRO-підписка</div>
+                <div style="font-size:11px; color:#9aa0b4; margin-top:2px;" id="accSubExpiry">—</div>
+              </div>
+            </div>
+            <p style="font-size:10.5px; color:#6f7488; line-height:1.6; margin-top:10px;">Підписка відкриває керування ПК, передачу файлів, термінал та всі інструменти на сайті.</p>
+          </section>
+
+          <!-- license key activation -->
+          <section class="fcx-card fcx-set-card fcx-in fcx-in-2">
+            <p class="fcx-eyebrow" style="margin-bottom:6px;">Активація ключа</p>
+            <p style="font-size:11px; color:#9aa0b4; line-height:1.55; margin-bottom:12px;">Введіть ліцензійний ключ, щоб продовжити або активувати підписку.</p>
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <input class="fcx-key-input" id="accKeyInput" placeholder="XXXX-XXXX-XXXX-XXXX" maxlength="24" spellcheck="false" />
+              <button class="fcx-btn fcx-btn-primary" style="height:38px; flex-shrink:0;" onclick="activateKey()">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>
+                <span>Активувати</span>
+              </button>
+            </div>
+          </section>
+
+          <!-- this computer + logout -->
+          <section class="fcx-card fcx-set-card fcx-in fcx-in-3">
+            <div class="fcx-set-row" style="padding:0;">
+              <div style="min-width:0;">
+                <div class="fcx-set-title">Цей комп'ютер</div>
+                <div class="fcx-set-sub" id="accPcName">— · підключений до вашого акаунта</div>
+              </div>
+              <button class="fcx-btn fcx-btn-danger fcx-btn-sm" style="flex-shrink:0;" onclick="sendToHost('logout')">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+                <span>Вийти з акаунта</span>
+              </button>
+            </div>
+          </section>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- ================= FULLSCREEN QR ================= -->
+  <div class="fcx-qr-full" id="qrFull" role="dialog" aria-modal="true" aria-label="QR-код на весь екран" onclick="closeQrFull()">
+    <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700; color:#d3d5e0;">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#c4b5fd" stroke-width="2"><rect width="5" height="5" x="3" y="3" rx="1"/><rect width="5" height="5" x="16" y="3" rx="1"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M21 16h-3a2 2 0 0 0-2 2v3M21 21v.01M12 7v3a2 2 0 0 1-2 2H7M3 12h.01M12 3h.01M12 16v.01M16 12h1M21 12v.01M12 21v-1"/></svg>
+      <span>Відскануйте камерою телефона</span>
+    </div>
+    <div class="bigbox"><img id="qrFullImg" src="" alt="QR Code" style="display:none;" /></div>
+    <div class="fcx-code" id="qrFullCode" style="font-size:20px; letter-spacing:.2em;">••••-••••-••••-••••</div>
+    <p class="hint">Натисніть будь-де або Esc, щоб закрити</p>
+  </div>
+
+  <!-- ================= REGENERATE CONFIRM ================= -->
+  <div class="fcx-regen-backdrop" id="regenModal" role="dialog" aria-modal="true" aria-label="Підтвердження оновлення коду">
+    <div class="fcx-pair-card fcx-in" style="max-width:400px; border-color:rgba(251,191,36,.25);">
+      <div class="fcx-pair-head">
+        <div class="fcx-pair-ico" style="background:rgba(217,119,6,.15); border-color:rgba(251,191,36,.35);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fcd34d" stroke-width="2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4M12 17h.01"/></svg>
+        </div>
+        <div class="fcx-pair-title">Оновити код підключення?</div>
+      </div>
+      <p class="fcx-pair-text">Поточний код і QR-код перестануть діяти одразу. Це вплине на інших:</p>
+      <div class="fcx-regen-list">
+        <div class="li"><svg viewBox="0 0 24 24" fill="none" stroke="#fb7185" stroke-width="2.4"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg><span>користувачі, які додали цей ПК за старим кодом, втратять доступ — пристрій стане недоступним;</span></div>
+        <div class="li"><svg viewBox="0 0 24 24" fill="none" stroke="#fb7185" stroke-width="2.4"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg><span>старе пряме посилання покаже помилку «код невірний»;</span></div>
+        <div class="li"><svg viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2.4"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/></svg><span>щоб підключитися знову, треба ввести новий код або відсканувати новий QR.</span></div>
+      </div>
+      <div class="fcx-pair-grid">
+        <button class="fcx-btn fcx-btn-ghost" onclick="closeRegenConfirm()">Скасувати</button>
+        <button class="fcx-btn fcx-btn-danger" onclick="confirmRegenerate()">Так, оновити</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= STARTUP SPLASH ================= -->
+  <div id="startupSplash">
+    <div class="fcx-titlebar" onmousedown="startDrag(event)">
+      <div class="fcx-tb-brand">
+        <div class="fcx-tb-logo"><svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+        <span class="fcx-tb-name">FluxControl</span>
+      </div>
+      <div class="fcx-tb-right" onmousedown="event.stopPropagation()">
+        <button class="fcx-tb-btn" onclick="sendToHost('window_minimize')" title="Згорнути">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" x2="19" y1="12" y2="12"/></svg>
+        </button>
+        <button class="fcx-tb-btn close" onclick="sendToHost('window_close')" title="Закрити">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="splash-content">
+      <div class="fcx-glow fcx-glow-a"></div>
+      <div class="splash-logo-box fcx-in">
+        <div class="splash-logo"><svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+        <span class="fcx-ring"></span>
+        <span class="fcx-ring fcx-ring-late"></span>
+      </div>
+      <h1 class="splash-word fcx-in fcx-in-1"><span class="a">Flux</span><span class="b">Control</span></h1>
+      <p class="splash-sub fcx-in fcx-in-2">Запуск програми: підвантаження бібліотек та перевірка даних…</p>
+      <div class="fcx-in fcx-in-3">
+        <div class="splash-pill">
+          <svg class="fcx-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+          <span>Ініціалізація захищеного зв'язку</span>
+        </div>
+        <div class="splash-bar fcx-shimmer-wrap"><i></i></div>
+      </div>
+    </div>
+    <div class="splash-foot">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6f7488" stroke-width="2"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>
+      Захищений віддалений доступ
+    </div>
+  </div>
+
+  <!-- ================= AUTH GATE ================= -->
+  <div id="authGate" class="fcx-screen">
+    <div class="fcx-titlebar" onmousedown="startDrag(event)">
+      <div class="fcx-tb-brand">
+        <div class="fcx-tb-logo"><svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+        <span class="fcx-tb-name">FluxControl — Вхід</span>
+      </div>
+      <div class="fcx-tb-right" onmousedown="event.stopPropagation()">
+        <button class="fcx-tb-btn" onclick="sendToHost('window_minimize')" title="Згорнути">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" x2="19" y1="12" y2="12"/></svg>
+        </button>
+        <button class="fcx-tb-btn close" onclick="sendToHost('window_close')" title="Закрити">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="fcx-screen-body">
+      <div class="fcx-glow fcx-glow-a"></div>
+      <div class="fcx-glow fcx-glow-b"></div>
+      <div class="fcx-auth-box fcx-in">
+        <div class="fcx-auth-logo">
+          <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          <span class="fcx-ring"></span>
+          <span class="fcx-ring fcx-ring-late"></span>
+        </div>
+        <h1>Вхід у FluxControl</h1>
+        <p class="sub">Програма не має доступу, поки ви не авторизуєтесь. Увійдіть у свій акаунт через браузер — після підтвердження головне вікно відкриється автоматично.</p>
+        <button class="fcx-btn fcx-btn-primary wfull" style="height:46px; font-size:13.5px;" onclick="sendToHost('login_via_browser')">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>
+          <span>Увійти через браузер</span>
+        </button>
+        <p class="fcx-note" style="text-align:center;">Відкриється сторінка входу fluxcontrol.pages.dev</p>
+        <div class="fcx-relay-row">
+          <div class="fcx-relay-line">
+            <span class="fcx-dot fcx-dot-warn" id="authRelayDot"></span>
+            <span id="authRelayTxt">Підключення до хмарної служби…</span>
+          </div>
+          <button class="fcx-btn fcx-btn-ghost fcx-btn-sm" id="authRetryBtn" style="display:none;" onclick="sendToHost('retry_connection')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+            <span>Спробувати ще раз</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= FFmpeg DEPENDENCY INSTALLER ================= -->
+  <div id="installerOverlay" class="fcx-screen">
+    <div class="fcx-titlebar" onmousedown="startDrag(event)">
+      <div class="fcx-tb-brand">
+        <div class="fcx-tb-logo"><svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+        <span class="fcx-tb-name">FluxControl — Встановлення компонентів</span>
+      </div>
+      <div class="fcx-tb-right" onmousedown="event.stopPropagation()">
+        <button class="fcx-tb-btn" onclick="sendToHost('window_minimize')" title="Згорнути">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" x2="19" y1="12" y2="12"/></svg>
+        </button>
+        <button class="fcx-tb-btn close" onclick="sendToHost('window_close')" title="Закрити">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="fcx-screen-body">
+      <div class="fcx-glow fcx-glow-a"></div>
+      <div class="fcx-install-box fcx-in">
+        <div class="fcx-install-icon" id="installIcon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+          <span class="fcx-ring"></span>
+          <span class="fcx-ring fcx-ring-late"></span>
+        </div>
+        <h1 id="installTitle" style="font-size:19px;">Встановлення компонентів</h1>
+        <p class="sub" id="installSub">FFmpeg потрібен для запису екрана та камери. Він завантажується автоматично — це одноразове встановлення.</p>
+
+        <div id="installProgressBlock" style="display:none;">
+          <div class="fcx-pct" id="installPct">0%</div>
+          <p class="fcx-eta" id="installEta" style="display:none;"></p>
+          <div class="fcx-progress fcx-shimmer-wrap"><i id="installProgressFill" style="width:4%;"></i></div>
+          <p class="fcx-stage" id="installStageTxt">завантаження… 0%</p>
+          <p class="fcx-minimize-note">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2.5"><line x1="5" x2="19" y1="12" y2="12"/></svg>
+            Можна згорнути вікно — встановлення триватиме у фоні
+          </p>
+        </div>
+
+        <div id="installActionsBlock" class="fcx-install-actions" style="display:none;">
+          <div class="fcx-errbox" id="installErrorBox" style="display:none;">
+            <p class="txt"><b>Помилка: </b><span id="installErrorTxt"></span></p>
+          </div>
+          <button class="fcx-btn fcx-btn-primary wfull" onclick="sendToHost('install_ffmpeg')">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+            <span id="installPrimaryTxt">Встановити автоматично</span>
+          </button>
+          <button class="fcx-btn fcx-btn-ghost wfull" onclick="window.open('https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip','_blank')">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>
+            <span>Завантажити вручну з офіційного сайту</span>
+          </button>
+          <button class="fcx-btn fcx-btn-ghost wfull" onclick="sendToHost('retry_dependency_check')">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+            <span>Перевірити ще раз</span>
+          </button>
+          <p class="fcx-note">Якщо завантажили вручну — розпакуйте <b>ffmpeg.exe</b> у папку <b>%AppData%\FluxControl\ffmpeg</b> або поруч із FluxControl.exe та натисніть «Перевірити ще раз». Постійна папка не зникає після пересборки програми.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= PAIRING REQUEST MODAL ================= -->
+  <div class="fcx-pair-backdrop" id="pairingModal" role="dialog" aria-modal="true" aria-label="Запит на підключення">
+    <div class="fcx-pair-card fcx-in">
+      <div class="fcx-pair-head">
+        <div class="fcx-pair-ico">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="14" height="8" x="5" y="2" rx="2"/><rect width="20" height="14" x="2" y="8" rx="2"/><line x1="6" x2="6.01" y1="15" y2="15"/><line x1="10" x2="10.01" y1="15" y2="15"/></svg>
+        </div>
+        <div style="min-width:0;">
+          <div class="fcx-pair-title">Запит на підключення</div>
+          <div class="fcx-pair-sub" id="pairingDeviceTxt">Невідомий пристрій</div>
+        </div>
+      </div>
+      <p class="fcx-pair-text">Пристрій <b id="pairingDeviceName" style="color:#fff;">—</b> хоче підключитися до цього комп'ютера та керувати ним. Дозволити доступ?</p>
+      <div class="fcx-pair-grid">
+        <button class="fcx-btn fcx-btn-ghost" onclick="respondPairing(false)">Відхилити</button>
+        <button class="fcx-btn fcx-btn-primary" onclick="respondPairing(true)">Дозволити</button>
+      </div>
+      <p class="fcx-pair-note">Запит автоматично скасується за 30 секунд</p>
+    </div>
+  </div>
+
+  </div><!-- /fcx-shell -->
+
+  <script>
+    let currentRawCode = '';
+    let currentHwid = '';
+    let pairingRequestId = null;
+    let qrVisible = true;
+    let relayConnected = false;
+    let relayErrored = false;
+    let ffmpegStatus = '';
+
+    // Кругле вікно: сторінка малює скруглення й тінь, коли живе в FluxControl.exe
+    if (window.chrome && window.chrome.webview) {
+      document.documentElement.classList.add('fcx-hosted');
+    }
+
+    function sendToHost(type, data = {}) {
+      if (window.chrome && window.chrome.webview) {
+        window.chrome.webview.postMessage({ type, ...data });
+      }
+    }
+
+    // ===== agent toasts (fcax) — same style as the hosted UI, distinct from site =====
+    const FCAX_ICONS = {
+      success: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
+      error: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg>',
+      warn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>',
+      info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>'
+    };
+    const FCAX_TITLES = { success: 'Готово', error: 'Помилка', warn: 'Увага', info: 'FluxControl' };
+    const FCAX_BG = { success: 'color:#34d399;background:rgba(16,185,129,.13);', error: 'color:#fb7185;background:rgba(244,63,94,.13);', warn: 'color:#fbbf24;background:rgba(245,158,11,.13);', info: 'color:#a78bfa;background:rgba(139,92,246,.14);' };
+    function agentToast(message, type = 'info', durationMs = 3600) {
+      let stack = document.getElementById('fcax-toast-stack');
+      if (!stack) {
+        stack = document.createElement('div');
+        stack.id = 'fcax-toast-stack';
+        (document.getElementById('fcx-shell') || document.body).appendChild(stack);
+      }
+      while (stack.children.length >= 4) stack.firstElementChild && stack.firstElementChild.remove();
+      const t = document.createElement('div');
+      t.className = 'fcax-toast fcax-' + type;
+      t.setAttribute('role', 'status');
+      const icon = document.createElement('span');
+      icon.className = 'fcax-icon';
+      icon.innerHTML = FCAX_ICONS[type] || FCAX_ICONS.info;
+      icon.setAttribute('style', FCAX_BG[type] || FCAX_BG.info);
+      const body = document.createElement('div');
+      body.className = 'fcax-body';
+      const title = document.createElement('span');
+      title.className = 'fcax-title';
+      title.innerHTML = '<span class="fcax-brand"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 3 14h7v8l10-12h-7l0-8z"/></svg></span>';
+      const tt = document.createElement('span'); tt.textContent = FCAX_TITLES[type] || 'FluxControl';
+      title.appendChild(tt);
+      const msg = document.createElement('span'); msg.className = 'fcax-msg'; msg.textContent = message;
+      body.appendChild(title); if (message && message !== tt.textContent) body.appendChild(msg);
+      const close = document.createElement('button'); close.className = 'fcax-close'; close.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+      close.addEventListener('click', () => dismiss());
+      t.appendChild(icon); t.appendChild(body); t.appendChild(close);
+      const bar = document.createElement('span'); bar.className = 'fcax-progress'; bar.style.animation = 'fcaxShrink ' + durationMs + 'ms linear forwards'; t.appendChild(bar);
+      stack.appendChild(t);
+      requestAnimationFrame(() => t.classList.add('show'));
+      let gone = false;
+      function dismiss() { if (gone) return; gone = true; t.classList.remove('show'); setTimeout(() => t.remove(), 280); }
+      setTimeout(dismiss, durationMs);
+    }
+
+    function startDrag(e) {
+      if (e.button === 0) sendToHost('window_drag');
+    }
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.fcx-nav-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.fcx-mtab').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      const mtabs = { main: 'mtabNavMain', account: 'mtabNavAccount', settings: 'mtabNavSettings' };
+      if (mtabs[tabId]) {
+        const m = document.getElementById(mtabs[tabId]);
+        if (m) m.classList.add('active');
+      }
+      if (tabId === 'main') {
+        document.getElementById('tabNavMain').classList.add('active');
+        document.getElementById('tabContentMain').classList.add('active');
+        try { history.replaceState(null, '', '#/home'); } catch (e) {}
+      } else if (tabId === 'account') {
+        document.getElementById('tabNavAccount').classList.add('active');
+        document.getElementById('tabContentAccount').classList.add('active');
+        try { history.replaceState(null, '', '#/account'); } catch (e) {}
+      } else if (tabId === 'settings') {
+        document.getElementById('tabNavSettings').classList.add('active');
+        document.getElementById('tabContentSettings').classList.add('active');
+        try { history.replaceState(null, '', '#/settings'); } catch (e) {}
+      }
+    }
+
+    // ===== fullscreen QR =====
+    function openQrFull() {
+      const img = document.getElementById('qrImg');
+      const fullImg = document.getElementById('qrFullImg');
+      if (img && img.src && img.style.display !== 'none') {
+        fullImg.src = img.src; fullImg.style.display = 'block';
+      }
+      document.getElementById('qrFullCode').textContent = document.getElementById('codeText').textContent;
+      document.getElementById('qrFull').classList.add('visible');
+    }
+    function closeQrFull() { document.getElementById('qrFull').classList.remove('visible'); }
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeQrFull(); closeRegenConfirm(); } });
+
+    // ===== regenerate confirm =====
+    function openRegenConfirm() { document.getElementById('regenModal').classList.add('visible'); }
+    function closeRegenConfirm() { document.getElementById('regenModal').classList.remove('visible'); }
+    function confirmRegenerate() {
+      closeRegenConfirm();
+      sendToHost('regenerate_code');
+      agentToast('Генеруємо новий код підключення…', 'info');
+    }
+
+    function toggleQr() {
+      qrVisible = !qrVisible;
+      document.getElementById('qrCard').style.display = qrVisible ? 'flex' : 'none';
+      document.getElementById('qrToggleTxt').textContent = qrVisible ? 'Приховати QR' : 'Показати QR';
+      document.getElementById('btnQrToggle').setAttribute('aria-pressed', String(qrVisible));
+    }
+
+    // Auth gate: show the login screen whenever no user session exists.
+    function applyAuthState(user) {
+      const gate = document.getElementById('authGate');
+      if (!gate) return;
+      if (user) gate.classList.remove('visible');
+      else gate.classList.add('visible');
+    }
+
+    // Cloud service status → title bar dot, stat card, auth screen, warn strip.
+    function applyRelayState(status, error) {
+      relayConnected = status === 'connected';
+      relayErrored = status === 'error';
+      const dotCls = relayConnected ? 'fcx-dot fcx-dot-ok fcx-dot-live' : relayErrored ? 'fcx-dot fcx-dot-err' : 'fcx-dot fcx-dot-warn';
+      const label = relayConnected ? 'Підключено' : relayErrored ? 'Помилка з\u2019єднання' : 'Підключення…';
+
+      document.getElementById('statusDot').className = dotCls;
+      document.getElementById('statusTxt').textContent = 'Хмарна служба: ' + label;
+
+      const ad = document.getElementById('authRelayDot');
+      ad.className = dotCls;
+      document.getElementById('authRelayTxt').textContent = relayConnected
+        ? 'Хмарна служба підключена'
+        : relayErrored ? 'Хмарна служба: помилка з\u2019єднання' : 'Підключення до хмарної служби…';
+      document.getElementById('authRetryBtn').style.display = relayErrored ? 'inline-flex' : 'none';
+
+      const strip = document.getElementById('relayStrip');
+      if (relayConnected) { strip.style.display = 'none'; return; }
+      strip.style.display = 'flex';
+      document.getElementById('relayStripTitle').textContent = relayErrored
+        ? 'Хмарна служба недоступна' : 'Підключення до хмарної служби…';
+      document.getElementById('relayStripSub').textContent = relayErrored && error
+        ? String(error) : 'Поки служба не підключена, код не працюватиме на сайті.';
+      document.getElementById('btnRetryConn').style.display = relayErrored ? 'inline-flex' : 'none';
+    }
+
+    // FFmpeg status → installer overlay + stat card + about row.
+    function applyDependencyState(ffmpeg) {
+      if (!ffmpeg) return;
+      ffmpegStatus = ffmpeg.status;
+      const overlay = document.getElementById('installerOverlay');
+      if (!overlay) return;
+      if (ffmpeg.status === 'ready' || ffmpeg.status === 'checking') {
+        overlay.classList.remove('visible');
+      } else {
+        overlay.classList.add('visible');
+      }
+
+      const label = ffmpeg.status === 'ready' ? 'Готовий'
+        : ffmpeg.status === 'checking' ? 'Перевірка…'
+        : ffmpeg.status === 'installing' ? 'Встановлення…'
+        : ffmpeg.status === 'error' ? 'Помилка' : 'Не знайдено';
+      document.getElementById('aboutFfmpeg').textContent = label;
+
+      const installing = ffmpeg.status === 'installing' || ffmpeg.status === 'missing';
+      const failed = ffmpeg.status === 'error';
+      document.getElementById('installTitle').textContent = installing ? 'Встановлення компонентів' : 'Потрібен компонент';
+      document.getElementById('installSub').textContent = installing
+        ? 'FFmpeg потрібен для запису екрана та камери. Він завантажується автоматично — це одноразове встановлення, далі все працюватиме без інтернету.'
+        : 'Для запису екрана та камери потрібна бібліотека FFmpeg.';
+      document.getElementById('installProgressBlock').style.display = installing ? 'block' : 'none';
+      document.getElementById('installActionsBlock').style.display = installing ? 'none' : 'block';
+      document.getElementById('installIcon').className = failed ? 'fcx-install-icon failed' : 'fcx-install-icon';
+      document.getElementById('installPrimaryTxt').textContent = failed ? 'Спробувати ще раз' : 'Встановити автоматично';
+      if (installing) {
+        const pct = Math.max(0, ffmpeg.percent || 0);
+        document.getElementById('installPct').textContent = Math.round(pct) + '%';
+        document.getElementById('installProgressFill').style.width = Math.max(2, pct) + '%';
+        document.getElementById('installStageTxt').textContent = (ffmpeg.stage || 'завантаження…') + ' ' + Math.round(pct) + '%';
+        updateEta(pct);
+      } else if (failed) {
+        document.getElementById('installErrorBox').style.display = ffmpeg.error ? 'block' : 'none';
+        document.getElementById('installErrorTxt').textContent = ffmpeg.error || '';
+      }
+    }
+
+    // ETA estimation (same math as the hosted UI).
+    let etaSamples = [];
+    function updateEta(p) {
+      const now = Date.now();
+      const last = etaSamples[etaSamples.length - 1];
+      if (last && p < last.p - 1) etaSamples = [];
+      if (!last || now - last.t >= 700) {
+        etaSamples.push({ t: now, p: p });
+        if (etaSamples.length > 40) etaSamples.shift();
+      }
+      const etaEl = document.getElementById('installEta');
+      if (p < 3 || etaSamples.length < 2) { etaEl.style.display = 'none'; return; }
+      const first = etaSamples[0];
+      const dP = p - first.p, dT = now - first.t;
+      if (dP >= 0.5 && dT >= 2000) {
+        const sec = Math.round((100 - p) / (dP / dT) / 1000);
+        etaEl.textContent = sec > 600 ? 'кілька хвилин…'
+          : sec >= 60 ? '≈ залишилось ' + Math.ceil(sec / 60) + ' хв'
+          : '≈ залишилось ' + Math.max(1, sec) + ' сек';
+        etaEl.style.display = 'block';
+      } else {
+        etaEl.style.display = 'none';
+      }
+    }
+
+    function copyCode() {
+      if (!currentRawCode) return;
+      navigator.clipboard.writeText(currentRawCode.replace(/-/g, ''))
+        .then(() => agentToast('Код скопійовано в буфер обміну', 'success'))
+        .catch(() => agentToast('Не вдалося скопіювати код', 'error'));
+    }
+
+    function copyWebLink() {
+      if (!currentRawCode) return;
+      const url = 'https://fluxcontrol.pages.dev/device/' + currentRawCode.replace(/-/g, '');
+      navigator.clipboard.writeText(url)
+        .then(() => agentToast('Пряме посилання скопійовано', 'success'))
+        .catch(() => agentToast('Не вдалося скопіювати посилання', 'error'));
+    }
+
+    // ===== license key activation (Account tab) =====
+    function activateKey() {
+      const input = document.getElementById('accKeyInput');
+      const clean = (input.value || '').trim().toUpperCase();
+      if (!clean) { agentToast('Введіть ліцензійний ключ', 'warn'); return; }
+      if (!window.__accUserId) { agentToast('Акаунт не розпізнано — увійдіть знову', 'error'); return; }
+      const payload = { userId: window.__accUserId, keyCode: clean };
+      const tryFetch = (url) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        .then(r => r.json());
+      Promise.resolve()
+        .then(() => tryFetch('/api/license/activate'))
+        .catch(() => tryFetch('https://fluxcontrol-backend.onrender.com/api/license/activate'))
+        .then((data) => {
+          if (data && data.success) {
+            input.value = '';
+            agentToast(data.message || 'Підписку активовано!', 'success', 4200);
+            if (data.expiresAt) applySubscription({ subscriptionExpiresAt: data.expiresAt, role: window.__accUserRole || 'user' });
+          } else {
+            agentToast((data && data.message) || 'Ключ не знайдено або він недійсний', 'error', 4200);
+          }
+        })
+        .catch(() => agentToast("Помилка з'єднання із сервером активації", 'error'));
+    }
+
+    function toggleAutoRun(checked) { sendToHost('set_autorun', { enable: checked }); }
+    function toggleTray(checked) { sendToHost('set_tray', { enable: checked }); }
+
+    // ===== profile + subscription rendering (sidebar + account tab) =====
+    function setAvatar(el, user) {
+      if (user.picture) el.innerHTML = '<img src="' + user.picture + '" alt="">';
+      else el.textContent = (user.name ? user.name.charAt(0) : 'U').toUpperCase();
+    }
+    function applySubscription(user) {
+      // Сайдбар-бейдж більше не існує (картка = ім'я + email); у «Акаунті» статус лишається.
+      const accBadge = document.getElementById('accSubBadge');
+      const ico = document.getElementById('accSubIco');
+      const title = document.getElementById('accSubTitle');
+      const expiry = document.getElementById('accSubExpiry');
+      const ts = user.subscriptionExpiresAt;
+      const active = user.role === 'admin' || ts === -1 || (ts && ts > Date.now());
+      let badgeCls = 'fcx-badge inactive', badgeTxt = 'Без підписки';
+      if (user.role === 'admin') { badgeCls = 'fcx-badge admin'; badgeTxt = 'Admin'; }
+      else if (ts === -1) { badgeCls = 'fcx-badge pro'; badgeTxt = 'PRO Безліміт'; }
+      else if (ts && ts > Date.now()) {
+        badgeCls = 'fcx-badge pro';
+        badgeTxt = 'PRO (' + Math.ceil((ts - Date.now()) / 86400000) + ' дн.)';
+      }
+      if (accBadge) { accBadge.className = badgeCls; accBadge.textContent = badgeTxt; }
+      title.textContent = user.role === 'admin' ? 'Адміністратор — повний доступ' : active ? 'PRO-підписка' : 'Без підписки';
+      ico.style.background = active ? 'rgba(52,211,153,.13)' : 'rgba(251,191,36,.12)';
+      ico.style.borderColor = active ? 'rgba(52,211,153,.35)' : 'rgba(251,191,36,.30)';
+      ico.style.color = active ? '#6ee7b7' : '#fcd34d';
+      if (ts === -1) expiry.textContent = 'Безстрокова (PRO Forever)';
+      else if (ts && ts > Date.now()) {
+        const d = new Date(ts);
+        const months = ['січ','лют','бер','кві','тра','чер','лип','сер','вер','жов','лис','гру'];
+        expiry.textContent = 'активна до ' + d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear();
+      } else expiry.textContent = 'Не активна';
+    }
+    function applyProfile(user) {
+      window.__accUserId = user.id || null;
+      window.__accUserRole = user.role || 'user';
+      document.getElementById('userNameTxt').textContent = user.name || 'Користувач';
+      document.getElementById('userEmailTxt').textContent = user.email || '';
+      setAvatar(document.getElementById('userAvatar'), user);
+      document.getElementById('accName').textContent = user.name || 'Користувач';
+      document.getElementById('accEmail').textContent = user.email || '—';
+      setAvatar(document.getElementById('accAvatar'), user);
+      applySubscription(user);
+    }
+
+    // ===== fullscreen QR: image synced in the message handler above =====
+
+    function showPairing(requestId, deviceName, ip) {
+      pairingRequestId = requestId;
+      document.getElementById('pairingDeviceName').textContent = deviceName;
+      document.getElementById('pairingDeviceTxt').textContent = deviceName + (ip ? ' · ' + ip : '');
+      document.getElementById('pairingModal').classList.add('visible');
+      clearTimeout(showPairing._t);
+      showPairing._t = setTimeout(hidePairing, 30500);
+    }
+    function hidePairing() {
+      pairingRequestId = null;
+      document.getElementById('pairingModal').classList.remove('visible');
+    }
+    function respondPairing(allow) {
+      if (!pairingRequestId) return;
+      sendToHost('respond_pairing', { requestId: pairingRequestId, allow: allow });
+      hidePairing();
+    }
+
+    // Handle messages from the WPF host.
+    if (window.chrome && window.chrome.webview) {
+      window.chrome.webview.addEventListener('message', (event) => {
+        try {
+          const msg = event.data || (typeof event === 'string' ? JSON.parse(event) : event);
+          if (!msg) return;
+
+          document.getElementById('startupSplash').classList.add('hidden');
+
+          if (msg.type === 'pairing_request' && msg.requestId) {
+            showPairing(String(msg.requestId), String(msg.deviceName || 'Невідомий пристрій'), msg.ip ? String(msg.ip) : null);
+          }
+
+          if (msg.code || msg.deviceCode) {
+            currentRawCode = msg.formattedCode || msg.code || msg.deviceCode;
+            document.getElementById('codeText').textContent = currentRawCode;
+          }
+
+          if (msg.hwid) currentHwid = msg.hwid;
+
+          if (msg.computerName) {
+            document.getElementById('pcNameBadge').style.display = 'inline-block';
+            document.getElementById('pcNameBadge').textContent = 'ПК: ' + msg.computerName;
+            document.getElementById('aboutPcName').textContent = msg.computerName;
+          }
+
+          if (msg.qrBase64 || msg.qrCode) {
+            const src = msg.qrBase64 || msg.qrCode;
+            const img = document.getElementById('qrImg');
+            img.src = src;
+            img.style.display = 'block';
+            document.getElementById('qrPlaceholder').style.display = 'none';
+            const fullImg = document.getElementById('qrFullImg');
+            fullImg.src = src;
+            fullImg.style.display = 'block';
+          }
+
+          if (msg.relayStatus || msg.relayError !== undefined) {
+            applyRelayState(String(msg.relayStatus || 'connecting'), msg.relayError);
+          }
+
+          if (msg.activeClients !== undefined) {
+            // Sessions count is surfaced by the title bar area in the hosted UI;
+            // the fallback keeps it in the relay strip subtitle position.
+          }
+
+          if (msg.autoRun !== undefined || msg.isAutoRun !== undefined) {
+            document.getElementById('autoRunSwitch').checked = Boolean(msg.autoRun ?? msg.isAutoRun);
+          }
+
+          if (msg.minimizeToTray !== undefined) {
+            document.getElementById('traySwitch').checked = Boolean(msg.minimizeToTray);
+          }
+
+          // User profile → sidebar block + account tab + auth gate.
+          const user = msg.user;
+          const loggedBox = document.getElementById('profileLoggedBox');
+          const guestBox = document.getElementById('profileGuestBox');
+          if (user) {
+            // Автотост при зміні підписки/ролі (хост опитує сервер кожні 20с;
+            // якщо вікно сховано — Windows-повідомлення покаже сам хост).
+            const prevU = window.__prevUser;
+            if (prevU && prevU.id && user.id && prevU.id === user.id &&
+                (prevU.subscriptionExpiresAt !== user.subscriptionExpiresAt || prevU.role !== user.role)) {
+              agentToast('Статус підписки оновлено', 'success');
+            }
+            window.__prevUser = user;
+            loggedBox.style.display = 'flex';
+            guestBox.style.display = 'none';
+            applyProfile(user);
+            if (msg.computerName) {
+              document.getElementById('accPcName').textContent = msg.computerName + ' · підключений до вашого акаунта';
+            }
+          } else {
+            loggedBox.style.display = 'none';
+            guestBox.style.display = 'block';
+          }
+
+          // Жива статистика з'єднання (пінг/швидкість авто-speedtest).
+          if (msg.speedTest) {
+            const st = msg.speedTest;
+            const has = Boolean(st.pingMs || st.downloadMbps);
+            const box = document.getElementById('speedStats');
+            if (box) {
+              box.style.display = has ? 'flex' : 'none';
+              if (st.pingMs) document.getElementById('stPing').textContent = Math.round(st.pingMs) + ' мс';
+              if (st.downloadMbps) document.getElementById('stDown').textContent = Number(st.downloadMbps).toFixed(1) + ' Мбіт/с';
+              if (st.uploadMbps) document.getElementById('stUp').textContent = Number(st.uploadMbps).toFixed(1) + ' Мбіт/с';
+            }
+          }
+
+          // Режим вікна (максимізовано → без скруглень).
+          if (msg.type === 'chrome' && msg.maximized !== undefined) {
+            document.documentElement.classList.toggle('fcx-max', Boolean(msg.maximized));
+          }
+
+          applyAuthState(user || null);
+          applyDependencyState(msg.ffmpeg || (msg.dependencies && msg.dependencies.ffmpeg));
+        } catch (e) {
+          console.error('[agent_ui] message error:', e);
+        }
+      });
+
+      sendToHost('ready');
+      if (location.hash === '#/settings') switchTab('settings');
+      if (location.hash === '#/auth') document.getElementById('authGate').classList.add('visible');
+    }
+
+    // Safety: the splash never traps the user.
+    setTimeout(() => {
+      document.getElementById('startupSplash').classList.add('hidden');
+    }, 2500);
+  </script>
+
+</body>
+</html>
