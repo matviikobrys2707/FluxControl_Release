@@ -594,6 +594,10 @@
             <div class="fcx-about-row"><span class="k">FluxControl</span><span class="v" id="aboutVersion">—</span></div>
             <div class="fcx-about-row"><span class="k">Компонент FFmpeg</span><span class="v" id="aboutFfmpeg">—</span></div>
             <div class="fcx-about-row"><span class="k">Ім'я комп'ютера</span><span class="v" id="aboutPcName">—</span></div>
+            <div style="display:flex; align-items:center; gap:10px; margin-top:12px;">
+              <button class="fcx-btn fcx-btn-ghost fcx-btn-sm" id="btnCheckUpdates" onclick="ucxCheck()">Перевірити оновлення</button>
+              <span id="ucxStatus" style="font-size:11px; color:#9aa0b4;"></span>
+            </div>
           </section>
         </div>
 
@@ -1229,6 +1233,29 @@
       hidePairing();
     }
 
+    // ===== ручна перевірка оновлень (кнопка в «Про програму») =====
+    function ucxCheck() {
+      const btn = document.getElementById('btnCheckUpdates');
+      const st = document.getElementById('ucxStatus');
+      if (!btn || !st) return;
+      btn.disabled = true;
+      st.style.color = '#9aa0b4';
+      st.textContent = 'Перевіряю…';
+      sendToHost('check_updates');
+    }
+
+    function ucxResult(msg) {
+      const btn = document.getElementById('btnCheckUpdates');
+      const st = document.getElementById('ucxStatus');
+      if (!btn || !st) return;
+      btn.disabled = false;
+      const ok = msg.state === 'latest' || msg.state === 'available';
+      st.style.color = msg.state === 'error' ? '#fda4af' : (msg.state === 'available' ? '#a5b4fc' : '#4ade80');
+      st.textContent = msg.message || '';
+      // статус зникає за 8 секунд, якщо це не помилка
+      if (ok) setTimeout(() => { if (st.textContent === msg.message) st.textContent = ''; }, 8000);
+    }
+
     // ===== update gate — блокуючий екран оновлення =====
     // Даних про оновлення присилає WPF-хост (update_available / update_progress).
     // Екран не можна закрити: кнопки закриття немає, оверлей перехоплює всі кліки.
@@ -1290,6 +1317,11 @@
           }
           if (msg.type === 'update_progress') {
             ugxProgress(msg.percent, msg.status);
+          }
+
+          // Результат ручної перевірки (кнопка «Перевірити оновлення»)
+          if (msg.type === 'update_check_result') {
+            ucxResult(msg);
           }
 
           if (msg.code || msg.deviceCode) {
