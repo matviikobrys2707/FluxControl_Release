@@ -549,7 +549,7 @@
 
           <section class="fcx-card fcx-set-card fcx-in fcx-in-1">
             <p class="fcx-eyebrow" style="margin-bottom:8px;">Про програму</p>
-            <div class="fcx-about-row"><span class="k">FluxControl Agent</span><span class="v">v2.0</span></div>
+            <div class="fcx-about-row"><span class="k">FluxControl</span><span class="v" id="aboutVersion">—</span></div>
             <div class="fcx-about-row"><span class="k">Компонент FFmpeg</span><span class="v" id="aboutFfmpeg">—</span></div>
             <div class="fcx-about-row"><span class="k">Ім'я комп'ютера</span><span class="v" id="aboutPcName">—</span></div>
           </section>
@@ -1175,6 +1175,10 @@
             document.getElementById('pcNameBadge').style.display = 'inline-block';
             document.getElementById('pcNameBadge').textContent = 'ПК: ' + msg.computerName;
             document.getElementById('aboutPcName').textContent = msg.computerName;
+          }
+
+          if (msg.appVersion) {
+            document.getElementById('aboutVersion').textContent = 'v' + msg.appVersion;
           }
 
           if (msg.qrBase64 || msg.qrCode) {
