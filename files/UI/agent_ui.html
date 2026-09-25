@@ -1324,6 +1324,12 @@
             ucxResult(msg);
           }
 
+          // ФІКС блимання екрану входу: повні дані стану приходять ЛИШЕ у
+          // type:'state'. Інші повідомлення (chrome/update_*/pairing_request)
+          // не містять user/code/ffmpeg — раніше через них виконувався
+          // applyAuthState(null), і на секунду з'являвся екран входу,
+          // навіть коли користувач залогінений.
+          if (msg.type === 'state') {
           if (msg.code || msg.deviceCode) {
             currentRawCode = msg.formattedCode || msg.code || msg.deviceCode;
             document.getElementById('codeText').textContent = currentRawCode;
@@ -1406,13 +1412,15 @@
             }
           }
 
+          // Гейт стану (user/авторизація/залежності) — кінець блоку type:'state'.
+          applyAuthState(user || null);
+          applyDependencyState(msg.ffmpeg || (msg.dependencies && msg.dependencies.ffmpeg));
+          } // === кінець if (msg.type === 'state') ===
+
           // Режим вікна (максимізовано → без скруглень).
           if (msg.type === 'chrome' && msg.maximized !== undefined) {
             document.documentElement.classList.toggle('fcx-max', Boolean(msg.maximized));
           }
-
-          applyAuthState(user || null);
-          applyDependencyState(msg.ffmpeg || (msg.dependencies && msg.dependencies.ffmpeg));
         } catch (e) {
           console.error('[agent_ui] message error:', e);
         }
